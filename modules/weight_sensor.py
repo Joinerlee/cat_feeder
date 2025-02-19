@@ -20,7 +20,7 @@ class LoadCell:
         self.is_calibrated = False
 
         if auto_tare:
-            print(f"전원 켜짐 후 {tare_delay}초 대기 중...")
+            print(f"전원 켠 후 {tare_delay}초 대기 중...")
             sleep(tare_delay)
             if self.tare():
                 print("자동 영점 보정이 완료되었습니다.")
@@ -30,6 +30,7 @@ class LoadCell:
     def read_raw_data(self):
         """원시 데이터 읽기"""
         self.sck.off()
+        # DOUT이 준비될 때까지 대기
         while self.dout.value:
             sleep(0.001)
 
@@ -39,14 +40,14 @@ class LoadCell:
             data = (data << 1) | self.dout.value
             self.sck.off()
 
-        # 마지막 펄스 추가 (게인 설정)
+        # 마지막 펄스로 게인 설정
         self.sck.on()
         self.sck.off()
         return data
 
     def tare(self, times=15):
         """
-        영점 조정 (여러번 측정 후 평균값을 OFFSET으로 설정)
+        영점 조정 (여러 번 측정 후 평균값을 OFFSET으로 설정)
         Args:
             times (int): 평균 측정 횟수 (기본값: 15)
         Returns:
@@ -62,24 +63,33 @@ class LoadCell:
             print(f"영점 조정 중 오류 발생: {e}")
             return False
 
-    def get_value(self, times=3):
+    def get_value(self, times=7):
         """
-        보정된 값 읽기 (OFFSET 적용)
+        보정된 값 읽기 (OFFSET 적용 및 이상치 제거)
         Args:
-            times (int): 평균 측정 횟수 (기본값: 3)
+            times (int): 측정 횟수 (기본값: 7)
         Returns:
             float: 보정된 측정값
         """
-        total = 0
+        readings = []
         for _ in range(times):
-            total += self.read_raw_data() - self.OFFSET
-        return float(total / times)
+            readings.append(self.read_raw_data() - self.OFFSET)
+            sleep(0.005)  # 짧은 딜레이 추가
 
-    def get_weight(self, times=3, unit='g'):
+        # 측정값이 충분하면 가장 큰 값과 가장 작은 값을 제거하여 이상치를 보정
+        if len(readings) >= 5:
+            readings.sort()
+            filtered = readings[1:-1]
+        else:
+            filtered = readings
+
+        return float(sum(filtered) / len(filtered))
+
+    def get_weight(self, times=7, unit='g'):
         """
         무게 측정
         Args:
-            times (int): 평균 측정 횟수 (기본값: 3)
+            times (int): 측정 횟수 (기본값: 7)
             unit (str): 무게 단위 ('g' 또는 'kg') (기본값: 'g')
         Returns:
             float: 측정된 무게
@@ -97,28 +107,39 @@ class LoadCell:
 
     def calibrate(self, known_weight_g):
         """
-        저울 보정
+        저울 보정 (예: 100g 기준)
         Args:
-            known_weight_g (float): 기준 무게(g)
+            known_weight_g (float): 기준 무게(g) (예: 100)
         Returns:
             bool: 보정 성공 여부
         """
         try:
-            print("보정을 시작합니다...")
-            print("1. 저울에서 모든 물체를 제거하세요")
-            input("준비되면 Enter를 누르세요...")
+            print("########################################")
+            print("보정 안내:")
+            print("1. 저울 위의 모든 물체를 제거해주세요.")
+            print("2. 준비가 되면 Enter를 눌러 영점 보정을 진행합니다.")
+            print("########################################")
+            input("Enter를 누르세요...")
+            
+            if self.tare():
+                print("영점 보정(Zero Tare)이 완료되었습니다.")
+            else:
+                print("영점 보정에 실패했습니다. 다시 시도해주세요.")
+                return False
 
-            self.tare()
-            print("영점 조정 완료")
+            print("########################################")
+            print(f"보정을 위해 {known_weight_g}g 기준 분동을 저울 위에 올려주세요.")
+            print("준비되면 Enter를 눌러 진행합니다.")
+            print("########################################")
+            input("Enter를 누르세요...")
 
-            print(f"\n2. {known_weight_g}g 기준 무게를 올려주세요")
-            input("준비되면 Enter를 누르세요...")
-
-            measured_value = self.get_value()
+            measured_value = self.get_value(times=15)
             self.SCALE = measured_value / known_weight_g
             self.is_calibrated = True
 
             print("보정이 완료되었습니다!")
+            print(f"측정된 기준값: {measured_value:.3f}")
+            print(f"계산된 SCALE 값: {self.SCALE:.6f}")
             return True
 
         except Exception as e:
@@ -145,8 +166,7 @@ if __name__ == "__main__":
     # 로드셀 객체 생성 (전원 켠 후 자동 영점 보정 수행)
     loadcell = LoadCell(dout_pin=15, sck_pin=14, auto_tare=True, tare_delay=1)
     
-    # 보정 수행 (100g 분동 사용 예시)
-    # 주의: 보정 시 자동 영점 보정 값이 초기 OFFSET에 반영되었으므로, 이후 보정을 진행할 수 있습니다.
+    # 100g 기준 보정 진행 (프린트 안내에 따라 진행)
     loadcell.calibrate(known_weight_g=100)
     
     # 연속 측정 시작
