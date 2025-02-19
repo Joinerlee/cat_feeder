@@ -132,7 +132,7 @@ class LoadCell:
 # 사용 예시
 if __name__ == "__main__":
     # 로드셀 객체 생성
-    loadcell = LoadCell(dout_pin=5, sck_pin=6)
+    loadcell = LoadCell(dout_pin=15, sck_pin=14)
     
     # 보정 수행 (100g 분동 사용 예시)
     loadcell.calibrate(known_weight_g=100)
