@@ -240,11 +240,10 @@ class LoadCell:
 if __name__ == "__main__":
     # default_scale 값은 보정 파일이 없을 경우에 사용할 기본 SCALE 값입니다.
     # 예를 들어, 이전 보정 결과나 경험에 의한 값을 입력하세요.
-    DEFAULT_SCALE = 5000.0  # <-- 이 값을 적절히 수정하세요
+    DEFAULT_SCALE = 440.0  # 경험적으로 보정된 SCALE 값
 
-    # 로드셀 객체 생성 (자동 영점 보정 수행 및 보정 파일이 없으면 default_scale 사용)
     loadcell = LoadCell(dout_pin=15, sck_pin=14, auto_tare=True, tare_delay=1, default_scale=DEFAULT_SCALE)
-    
+
     # 최초 보정이 필요하면 아래 주석을 해제하고 100g 분동으로 보정 진행
     # loadcell.calibrate(known_weight_g=100)
     
