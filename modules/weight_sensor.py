@@ -126,7 +126,8 @@ class LoadCell:
             print("경고: 보정이 되지 않은 상태입니다. 올바른 무게를 얻으려면 calibrate()를 실행하거나 저장된 보정값 파일 또는 default_scale을 사용하세요.")
         
         value = self.get_value(times)
-        weight = value / self.SCALE
+        weight = - (value / self.SCALE)
+
         
         if unit == 'kg':
             weight = weight / 1000
