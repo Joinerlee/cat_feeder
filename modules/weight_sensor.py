@@ -7,22 +7,24 @@ class LoadCell:
 
     CALIBRATION_FILE = "calibration.cfg"
 
-    def __init__(self, dout_pin=15, sck_pin=14, auto_tare=True, tare_delay=1):
+    def __init__(self, dout_pin=15, sck_pin=14, auto_tare=True, tare_delay=1, default_scale=None):
         """
         로드셀 초기화  
         - 전원 켠 후 자동 영점 보정(tare)  
-        - 저장된 보정 파일(calibration.cfg)이 있으면 SCALE 값을 불러옴  
+        - 보정 파일(calibration.cfg)이 있으면 SCALE 값을 불러오고, 없으면 default_scale을 사용
         
         Args:
             dout_pin (int): DOUT 핀 번호 (기본값: 15)
             sck_pin (int): SCK 핀 번호 (기본값: 14)
             auto_tare (bool): 전원 켠 후 자동으로 영점 보정할지 여부 (기본값: True)
             tare_delay (float): 전원 켠 후 영점 보정 전 대기 시간(초) (기본값: 1)
+            default_scale (float or None): 보정 파일이 없을 경우 사용할 기본 SCALE 값.
+                                           None이면 보정되지 않은 상태로 경고 메시지를 출력함.
         """
         self.dout = DigitalInputDevice(dout_pin)
         self.sck = DigitalOutputDevice(sck_pin)
         self.OFFSET = 0
-        self.SCALE = 1  # 보정되지 않은 상태의 기본 SCALE
+        self.SCALE = 1  # 보정되지 않은 상태의 기본 SCALE 값
         self.is_calibrated = False
 
         if auto_tare:
@@ -33,14 +35,19 @@ class LoadCell:
             else:
                 print("자동 영점 보정에 실패했습니다.")
 
-        # 이전 보정값이 있으면 자동으로 불러옴
+        # 보정 파일이 있으면 불러오고, 없으면 default_scale 사용
         if os.path.exists(self.CALIBRATION_FILE):
             if self.load_calibration(self.CALIBRATION_FILE):
                 print("보정 파일에서 SCALE 값을 불러왔습니다.")
             else:
                 print("보정 파일 불러오기에 실패했습니다.")
         else:
-            print("보정 파일이 없습니다. 최초 보정을 진행해주세요.")
+            if default_scale is not None:
+                self.SCALE = default_scale
+                self.is_calibrated = True
+                print(f"보정 파일이 없습니다. default_scale 값({self.SCALE})을 사용하여 자동 스케일링합니다.")
+            else:
+                print("보정 파일이 없습니다. 최초 보정을 진행해주세요.")
 
     def read_raw_data(self):
         """원시 데이터 읽기"""
@@ -116,7 +123,7 @@ class LoadCell:
             float: 측정된 무게
         """
         if not self.is_calibrated:
-            print("경고: 보정이 되지 않은 상태입니다. 올바른 무게를 얻으려면 calibrate()를 실행하거나 저장된 보정값 파일을 사용하세요.")
+            print("경고: 보정이 되지 않은 상태입니다. 올바른 무게를 얻으려면 calibrate()를 실행하거나 저장된 보정값 파일 또는 default_scale을 사용하세요.")
         
         value = self.get_value(times)
         weight = value / self.SCALE
@@ -183,7 +190,7 @@ class LoadCell:
         """
         try:
             with open(filename, "w") as f:
-                # OFFSET은 보정 시에 계속 사용하지만, SCALE이 핵심임
+                # OFFSET과 SCALE 저장
                 f.write(f"{self.OFFSET}\n")
                 f.write(f"{self.SCALE}\n")
         except Exception as e:
@@ -231,10 +238,14 @@ class LoadCell:
 
 # 사용 예시
 if __name__ == "__main__":
-    # 로드셀 객체 생성 (자동 영점 보정 수행 및 저장된 보정값 사용 시 자동 로드)
-    loadcell = LoadCell(dout_pin=15, sck_pin=14, auto_tare=True, tare_delay=1)
+    # default_scale 값은 보정 파일이 없을 경우에 사용할 기본 SCALE 값입니다.
+    # 예를 들어, 이전 보정 결과나 경험에 의한 값을 입력하세요.
+    DEFAULT_SCALE = 5000.0  # <-- 이 값을 적절히 수정하세요
+
+    # 로드셀 객체 생성 (자동 영점 보정 수행 및 보정 파일이 없으면 default_scale 사용)
+    loadcell = LoadCell(dout_pin=15, sck_pin=14, auto_tare=True, tare_delay=1, default_scale=DEFAULT_SCALE)
     
-    # 만약 최초 보정이 필요하다면 아래 주석을 해제하고 100g 분동으로 보정 진행
+    # 최초 보정이 필요하면 아래 주석을 해제하고 100g 분동으로 보정 진행
     # loadcell.calibrate(known_weight_g=100)
     
     # 연속 측정 시작
